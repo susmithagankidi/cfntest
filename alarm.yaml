@@ -1,1 +1,14 @@
-
+Resources:
+    CPUAlarmHigh:
+        Type: 'AWS::CloudWatch::Alarm'
+        Properties:
+            Namespace: AWS/DynamoDB
+            MetricName: SystemErrors
+            Dimensions:
+              - Name: TableName
+                Value: test
+            Statistic: Sum
+            Period: 60
+            EvaluationPeriods: 1
+            ComparisonOperator: GreaterThanOrEqualToThreshold
+            Threshold: 1
