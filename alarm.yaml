@@ -9,6 +9,6 @@ Resources:
                 Value: test
             Statistic: Sum
             Period: 60
-            EvaluationPeriods: 1
+            EvaluationPeriods: 2
             ComparisonOperator: GreaterThanOrEqualToThreshold
             Threshold: 1
