@@ -8,7 +8,7 @@ Resources:
               - Name: TableName
                 Value: test
             Statistic: Sum
-            Period: 60
+            Period: 70
             EvaluationPeriods: 2
             ComparisonOperator: GreaterThanOrEqualToThreshold
             Threshold: 1
