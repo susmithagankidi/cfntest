@@ -1,14 +1,87 @@
 Resources:
-    CPUAlarmHigh:
-        Type: 'AWS::CloudWatch::Alarm'
-        Properties:
-            Namespace: AWS/DynamoDB
-            MetricName: SystemErrors
-            Dimensions:
-              - Name: TableName
-                Value: test
-            Statistic: Sum
-            Period: 70
-            EvaluationPeriods: 2
-            ComparisonOperator: GreaterThanOrEqualToThreshold
-            Threshold: 1
+  #EC2 IAM Role CONTROLLERBOX TQA
+  rControllerBoxqaRoleName:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: "rolessm"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchEventsFullAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+  #EC2 Instance Profile ControllerBox EC2 Role
+  rControllerBoxqaInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - Ref: rControllerBoxqaRoleName
+
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: "PT30M"
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          InstallAndRun:
+            - "runcommands"
+        runcommands:
+          commands:
+            01-install-amazon-ssm-agent:
+              command: sudo yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+            02-start-amazon-ssm-agent:
+              command: sudo service amazon-ssm-agent start
+            03-command-signal:
+              command:
+                Fn::Join:
+                  - ""
+                  - - "/opt/aws/bin/cfn-signal -e 0 --stack "
+                    - Ref: AWS::StackName
+                    - " --resource Ec2Instance --region "
+                    - Ref: AWS::Region
+        createfiles:
+          files:
+            /etc/cfn/cfn-hup.conf:
+              content:
+                Fn::Join:
+                  - ""
+                  - - "[main]\n"
+                    - stack=
+                    - Ref: AWS::StackId
+                    - "\n"
+                    - region=
+                    - Ref: AWS::Region
+                    - "\n"
+              mode: "000400"
+              owner: root
+              group: root
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.Ec2Instance.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
+                runas=root
+    Properties:
+      ImageId: ami-074cce78125f09d61
+      KeyName: sush-aws-pem
+      SubnetId: subnet-0e84f213cb3b0ed99
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref rControllerBoxqaInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -ex      
+          opt/aws/bin/cfn-init -v --configsets InstallAndRun --stack ${AWS::StackName} --resource Ec2Instance --region ${AWS::Region}
